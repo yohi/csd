@@ -29,7 +29,8 @@ SERVER_PID=$!
 cleanup() {
   echo -e "\n${GREEN}Cleaning up...${NC}"
   if [ -n "$SERVER_PID" ]; then
-    kill $SERVER_PID 2>/dev/null || true
+    # Kill all child processes (including the server and its subprocesses)
+    pkill -P $$ || true
   fi
 }
 trap cleanup EXIT
@@ -77,7 +78,7 @@ fi
 # 注: トークンがないため、通常は 401 Unauthorized または 500 (トークンファイル不在時) を期待します。
 # ルーティングが機能していることを確認するのが目的です。
 echo -n "Testing /v1/messages endpoint (routing check)... "
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:$CSG_PORT/v1/messages \
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:$CSG_PORT/v1/messages \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
@@ -87,11 +88,22 @@ HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:$CSG
     "stream": false
   }')
 
-# 401 (Unauthorized) または 500 (Token file not found) なら、ハンドラーには到達している
-if [ "$HTTP_CODE" == "401" ] || [ "$HTTP_CODE" == "500" ] || [ "$HTTP_CODE" == "200" ]; then
+HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+BODY=$(echo "$RESPONSE" | sed '$d')
+
+# 401 (Unauthorized) または 500 (Token file not found / Encryption key error) なら、ハンドラーには到達している
+if [ "$HTTP_CODE" == "200" ] || [ "$HTTP_CODE" == "401" ]; then
   echo -e "${GREEN}PASS${NC} (HTTP $HTTP_CODE)"
+elif [ "$HTTP_CODE" == "500" ]; then
+  if [[ "$BODY" == *"No token file found"* ]] || [[ "$BODY" == *"Secure encryption key"* ]] || [[ "$BODY" == *"Internal server error"* ]]; then
+     echo -e "${GREEN}PASS${NC} (HTTP 500 - Expected error: $(echo $BODY | cut -c 1-50)...)"
+  else
+     echo -e "${RED}FAIL${NC} (HTTP 500 - Unexpected error body: $BODY)"
+     exit 1
+  fi
 else
   echo -e "${RED}FAIL${NC} (HTTP $HTTP_CODE)"
+  echo "Body: $BODY"
   exit 1
 fi
 

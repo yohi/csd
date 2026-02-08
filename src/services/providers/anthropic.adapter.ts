@@ -118,7 +118,6 @@ export class AnthropicAdapter implements ProviderAdapter {
                         reader.releaseLock();
                     } catch (e) {
                     }
-                    controller.abort();
                 }
             } else {
                 const data = await response.json();

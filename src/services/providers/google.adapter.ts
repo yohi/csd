@@ -18,6 +18,11 @@ export class GoogleAdapter implements ProviderAdapter {
         const response = await googleTranspiler.callAPI(googleReq, model, token, stream);
 
         if (stream) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders();
+
             for await (const chunk of googleTranspiler.convertStreamResponse(response, model)) {
                 res.write(chunk);
             }

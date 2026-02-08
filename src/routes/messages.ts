@@ -28,6 +28,10 @@ export const handleMessages = async (req: Request, res: Response) => {
         logger.error('Error in handleMessages:', error);
 
         const streamVal = req.body?.stream === undefined ? true : req.body?.stream;
+        if (res.writableEnded || res.destroyed) {
+            return;
+        }
+
         if (streamVal || res.headersSent) {
             // Error during streaming or streaming intended
             if (!res.headersSent) {
