@@ -16,7 +16,30 @@ ClaudeCode CLI (`claude`) が、Anthropic APIの代わりに OpenAI (Codex) や 
 *   **プロトコル変換**: Anthropic Messages APIのリクエスト/レスポンスをOpenAI/Gemini形式に相互変換
 *   **ストリーミング対応**: Server-Sent Events (SSE) によるリアルタイムレスポンス変換により、スムーズな表示を実現
 *   **認証マネージャー**: CLI向けのOAuthフロー（Device Flow / Loopback）を模倣し、トークンを安全に管理
-*   **モデルルーティング**: リクエストされたモデル名に応じて適切なプロバイダーへ自動振り分け
+*   **モデル一覧提供 (`/models`)**: ClaudeCodeが起動時に問い合わせるモデル一覧エンドポイントを提供し、利用可能なバックエンドモデルを動的に通知
+*   **モデルルーティングとパススルー**: エイリアスによる自動マッピングに加え、バックエンドのモデルIDを直接指定するパススルーリクエストに対応
+
+## 対応モデルとマッピング
+
+ClaudeCodeから指定されたモデルは、以下のようにバックエンドのモデルへ自動的にマッピングされます。
+
+| ClaudeCode指定モデル (Alias) | OpenAI (Codex) | Google (Antigravity) |
+| :--- | :--- | :--- |
+| `claude-3-5-sonnet-20241022` | `gpt-4o` | `gemini-1.5-pro` |
+| `claude-3-opus-20240229` | `gpt-4o` | `gemini-1.5-pro` |
+| `claude-3-sonnet-20240229` | `gpt-4o` | `gemini-1.5-pro` |
+| `claude-3-haiku-20240307` | `gpt-4o-mini` | `gemini-2.0-flash-exp` |
+
+### パススルー機能
+
+マッピング表にないモデル名が指定された場合、ゲートウェイは以下のルールでバックエンドへリクエストをパススルー（そのまま転送）します。
+
+1.  **OpenAI**: `gpt-`, `o1-`〜`o9-`, `chatgpt-` で始まるモデル名、または `codex` を含むモデル名は、そのままOpenAIへ転送されます。
+2.  **Google**: `gemini-` で始まるモデル名、または `antigravity` を含むモデル名は、そのままGoogleへ転送されます。
+3.  **Anthropic (上記以外)**: 上記のいずれにも該当しないモデル名は、**Anthropic APIへ直接転送（パススルー）**されます。
+    *   **重要**: Anthropicへのパススルーを利用する場合、有効な `x-api-key` ヘッダーが必要です。ダミーのキーでは認証エラーとなります。
+
+これにより、新しく追加されたモデルやExperimentalなモデルも即座に利用可能です。
 
 ## インストールとセットアップ
 
@@ -76,8 +99,12 @@ ClaudeCodeがローカルゲートウェイを経由するように環境変数�
 # ゲートウェイのアドレス
 export ANTHROPIC_BASE_URL="http://localhost:4000"
 
-# APIキーチェックを回避するためのダミーキー（ゲートウェイ側で無視されます）
-export ANTHROPIC_API_KEY="sk-dummy-subscription-key"
+# 重要: Anthropicパススルーを使用する場合は有効なAPIキーを設定してください。
+# OpenAI/Google変換のみを使用する場合でも、クライアントの要件を満たすために
+# 何らかの値を設定する必要があります（例: ダミーキー）。
+export ANTHROPIC_API_KEY="sk-ant-api03-..." 
+# または
+export ANTHROPIC_API_KEY="dummy-key-for-gateway"
 ```
 
 ### 4. ClaudeCodeの実行
@@ -90,6 +117,9 @@ claude --model gpt-4o
 
 # Gemini 1.5 Pro を使用する場合
 claude --model gemini-1.5-pro
+
+# Gemini 2.0 Flash (Experimental) を使用する場合
+claude --model gemini-2.0-flash-exp
 ```
 
 ## 開発
@@ -99,6 +129,11 @@ claude --model gemini-1.5-pro
 *   **開発サーバー**: `npm run dev`
 
 ## アーキテクチャ
+
+本ゲートウェイはClaudeCodeが期待するAnthropic APIの挙動を完全にエミュレートします。
+
+1.  **`/models` エンドポイント**: 起動時に利用可能なモデルID（`gpt-4o`, `gemini-1.5-pro` 等）と、Claudeのエイリアスを返却します。
+2.  **`/messages` エンドポイント**: チャット補完リクエストを受け取り、指定されたモデルに応じてバックエンドAPI（OpenAI/Vertex）へプロトコル変換して転送します。
 
 ```mermaid
 graph LR
