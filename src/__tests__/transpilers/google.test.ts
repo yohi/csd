@@ -152,8 +152,7 @@ describe('Google Transpiler', () => {
     });
 
     describe('convertStreamResponse', () => {
-        // TODO: Fix SSE event verification. Expected events are emitted but test fails on sequence check.
-        it.skip('should emit proper SSE event sequence', async () => {
+        it('should emit proper SSE event sequence', async () => {
             const sseData = [
                 'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
                 'data: {"candidates":[{"content":{"parts":[{"text":" world"}]}}]}',
