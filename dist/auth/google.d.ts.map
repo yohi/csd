@@ -1,0 +1,1 @@
+{"version":3,"file":"google.d.ts","sourceRoot":"","sources":["../../src/auth/google.ts"],"names":[],"mappings":"AAiBA,qBAAa,UAAU;YACL,gBAAgB;IAiC9B,OAAO,CAAC,YAAY;YAaN,oBAAoB;IAuB5B,KAAK,IAAI,OAAO,CAAC,IAAI,CAAC;IAiCtB,aAAa,IAAI,OAAO,CAAC,MAAM,CAAC;CA8CzC;AAED,eAAO,MAAM,UAAU,YAAmB,CAAC"}
