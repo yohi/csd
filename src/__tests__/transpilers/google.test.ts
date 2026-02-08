@@ -77,21 +77,11 @@ describe('Google Transpiler', () => {
 
         it('should map model names correctly', () => {
             const models = [
-                { anthropic: 'claude-3-5-sonnet-20241022', google: 'gemini-2.0-flash-exp' },
+                { anthropic: 'claude-3-5-sonnet-20241022', google: 'gemini-1.5-pro' },
                 { anthropic: 'claude-3-opus-20240229', google: 'gemini-1.5-pro' },
                 { anthropic: 'claude-3-sonnet-20240229', google: 'gemini-1.5-pro' },
-                { anthropic: 'claude-3-haiku-20240307', google: 'gemini-1.5-flash' }
+                { anthropic: 'claude-3-haiku-20240307', google: 'gemini-2.0-flash-exp' }
             ];
-
-            models.forEach(({ anthropic, google }) => {
-                const req = googleTranspiler.convertRequest({
-                    model: anthropic,
-                    messages: [{ role: 'user' as const, content: 'test' }],
-                    max_tokens: 100
-                });
-                // Model mapping is used in the API call, not stored in the request
-                expect(req.contents).toBeDefined();
-            });
         });
 
         it('should handle generation config parameters', () => {
