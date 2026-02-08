@@ -13,7 +13,10 @@ interface TokenData {
 export class TokenStore {
     private encryptionKey: Buffer;
 
-    constructor(password: string = process.env.CSG_ENCRYPTION_KEY || 'default-key-change-me') {
+    constructor(password: string | undefined = process.env.CSG_ENCRYPTION_KEY) {
+        if (!password || password === 'default-key-change-me') {
+            throw new Error('Fatal: Secure encryption key not configured.');
+        }
         // Derive a 32-byte key from password
         this.encryptionKey = scryptSync(password, 'salt', 32);
     }
@@ -107,4 +110,22 @@ export class TokenStore {
     }
 }
 
-export const tokenStore = new TokenStore();
+let singleton: TokenStore | null = null;
+
+export const getTokenStore = (): TokenStore => {
+    if (!singleton) {
+        singleton = new TokenStore();
+    }
+    return singleton;
+};
+
+export const tokenStore = new Proxy({} as TokenStore, {
+    get: (_, prop) => {
+        const store = getTokenStore();
+        const value = (store as any)[prop];
+        if (typeof value === 'function') {
+            return value.bind(store);
+        }
+        return value;
+    }
+});
