@@ -25,6 +25,15 @@ export class OpenAIAuth {
         return { codeVerifier, codeChallenge };
     }
 
+    private escapeHtml(unsafe: string): string {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     private async startLocalServer(expectedState: string): Promise<{ server: Server; code: Promise<string> }> {
         return new Promise((resolve, reject) => {
             let codeResolver!: (code: string) => void;
@@ -48,8 +57,9 @@ export class OpenAIAuth {
                     const error = url.query.error as string;
 
                     if (error) {
+                        const safeError = this.escapeHtml(error);
                         res.writeHead(400, { 'Content-Type': 'text/html' });
-                        res.end(`<h1>Authentication Failed</h1><p>Error: ${error}</p>`);
+                        res.end(`<h1>Authentication Failed</h1><p>Error: ${safeError}</p>`);
                         codeResolver('');
                     } else if (state !== expectedState) {
                         res.writeHead(400, { 'Content-Type': 'text/html' });
