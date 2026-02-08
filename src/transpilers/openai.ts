@@ -91,13 +91,25 @@ export class OpenAITranspiler {
                 'claude-3-haiku-20240307': 'gpt-4o-mini'
             };
 
-            const openaiModel = modelMap[anthropicReq.model] || 'gpt-4o';
+            let openaiModel: string;
+            const mappedModel = modelMap[anthropicReq.model];
+
+            if (anthropicReq.model.startsWith('gpt-')) {
+                openaiModel = anthropicReq.model;
+            } else if (mappedModel) {
+                openaiModel = mappedModel;
+            } else {
+                throw new TranspilerError(`Unsupported model: ${anthropicReq.model}`);
+            }
 
             const openaiReq: OpenAIRequest = {
                 model: openaiModel,
-                messages,
-                stream: anthropicReq.stream ?? true
+                messages
             };
+
+            if (anthropicReq.stream !== undefined) {
+                openaiReq.stream = anthropicReq.stream;
+            }
 
             // Add optional parameters only if defined
             if (anthropicReq.max_tokens !== undefined) {
