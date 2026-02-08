@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { ProviderError, TranspilerError } from '../utils/errors.js';
@@ -116,7 +115,12 @@ export class GoogleTranspiler {
      * Call Google Gemini API
      */
     async callAPI(googleReq: GoogleRequest, anthropicModel: string, token: string, stream: boolean = true): Promise<Response> {
+        let timeoutId: NodeJS.Timeout | undefined;
+        const controller = new AbortController();
+
         try {
+            timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
             const model = this.mapModel(anthropicModel);
             const endpoint = stream ? 'streamGenerateContent' : 'generateContent';
             const url = `${config.google.apiUrl}/v1/models/${model}:${endpoint}`;
@@ -127,8 +131,11 @@ export class GoogleTranspiler {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(googleReq)
+                body: JSON.stringify(googleReq),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -141,19 +148,78 @@ export class GoogleTranspiler {
             }
 
             return response;
-        } catch (error) {
+        } catch (error: any) {
+            if (timeoutId) clearTimeout(timeoutId);
+
             if (error instanceof ProviderError) {
                 throw error;
             }
+
+            if (error.name === 'AbortError' || error.name === 'TimeoutError' || controller.signal.aborted) {
+                throw new ProviderError('Google API request timed out', 'google', 408);
+            }
+
             logger.error('Google API call failed:', error);
             throw new ProviderError('Failed to communicate with Google', 'google');
         }
     }
 
     /**
+     * Convert Google Gemini non-streaming response to Anthropic format
+     */
+    private mapFinishReason(finishReason: string | undefined): string | null {
+        if (!finishReason) return null;
+        switch (finishReason) {
+            case 'STOP':
+            case 'FINISHED':
+                return 'end_turn';
+            case 'MAX_TOKENS':
+                return 'max_tokens';
+            case 'STOP_SEQUENCE':
+                return 'stop_sequence';
+            case 'SAFETY':
+            case 'RECITATION':
+                return 'refusal';
+            case 'INTERRUPTED':
+                return 'end_turn';
+            default:
+                return 'end_turn';
+        }
+    }
+
+    /**
+     * Convert Google Gemini non-streaming response to Anthropic format
+     */
+    async convertResponse(response: Response, model: string): Promise<any> {
+        const data = await response.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const finishReason = data.candidates?.[0]?.finishReason;
+        const stopReason = this.mapFinishReason(finishReason);
+
+        return {
+            id: `msg_${Math.random().toString(36).substring(2, 15)}`,
+            type: 'message',
+            role: 'assistant',
+            content: [
+                {
+                    type: 'text',
+                    text: content
+                }
+            ],
+            model: model,
+            stop_reason: stopReason,
+            stop_sequence: stopReason === 'stop_sequence' ? null : null, // stop_sequence value not easily available in standard finishReason
+            usage: {
+                input_tokens: data.usageMetadata?.promptTokenCount || 0,
+                output_tokens: data.usageMetadata?.candidatesTokenCount || 0
+            }
+        };
+    }
+
+    /**
      * Convert Google SSE stream to Anthropic format
      */
-    async *convertStreamResponse(response: Response): AsyncGenerator<string> {
+    async *convertStreamResponse(response: Response, model: string): AsyncGenerator<string> {
         if (!response.body) {
             throw new ProviderError('No response body from Google', 'google');
         }
@@ -162,6 +228,33 @@ export class GoogleTranspiler {
         const decoder = new TextDecoder();
         let buffer = '';
 
+        // Generate message ID
+        const messageId = `msg_${Math.random().toString(36).substring(2, 15)}`;
+
+        // Emit message_start
+        yield `event: message_start\ndata: ${JSON.stringify({
+            type: 'message_start',
+            message: {
+                id: messageId,
+                type: 'message',
+                role: 'assistant',
+                content: [],
+                model: model,
+                stop_reason: null,
+                stop_sequence: null,
+                usage: { input_tokens: 0, output_tokens: 0 }
+            }
+        })}\n\n`;
+
+        // Emit content_block_start
+        yield `event: content_block_start\ndata: ${JSON.stringify({
+            type: 'content_block_start',
+            index: 0,
+            content_block: {
+                type: 'text',
+                text: ''
+            }
+        })}\n\n`;
         try {
             while (true) {
                 const { done, value } = await reader.read();
@@ -185,22 +278,43 @@ export class GoogleTranspiler {
                                 const parts = content?.parts;
 
                                 if (parts && parts.length > 0 && parts[0].text) {
-                                    // Convert to Anthropic format
-                                    const anthropicChunk = {
+                                    // Emit content_block_delta
+                                    yield `event: content_block_delta\ndata: ${JSON.stringify({
                                         type: 'content_block_delta',
                                         index: 0,
                                         delta: {
                                             type: 'text_delta',
                                             text: parts[0].text
                                         }
-                                    };
-
-                                    yield `event: content_block_delta\ndata: ${JSON.stringify(anthropicChunk)}\n\n`;
+                                    })}\n\n`;
                                 }
 
                                 // Check for finish reason
                                 if (candidates[0].finishReason) {
-                                    yield `event: message_stop\ndata: {}\n\n`;
+                                    const stopReason = this.mapFinishReason(candidates[0].finishReason);
+
+                                    // Emit content_block_stop
+                                    yield `event: content_block_stop\ndata: ${JSON.stringify({
+                                        type: 'content_block_stop',
+                                        index: 0
+                                    })}\n\n`;
+
+                                    // Emit message_delta
+                                    yield `event: message_delta\ndata: ${JSON.stringify({
+                                        type: 'message_delta',
+                                        delta: {
+                                            stop_reason: stopReason,
+                                            stop_sequence: null
+                                        },
+                                        usage: {
+                                            output_tokens: parsed.usageMetadata?.candidatesTokenCount || 0
+                                        }
+                                    })}\n\n`;
+
+                                    // Emit message_stop
+                                    yield `event: message_stop\ndata: ${JSON.stringify({
+                                        type: 'message_stop'
+                                    })}\n\n`;
                                 }
                             }
                         } catch (parseError) {
