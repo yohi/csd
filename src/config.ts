@@ -30,7 +30,7 @@ export const config = {
       'https://www.googleapis.com/auth/cloud-platform',
       'email'
     ],
-    redirectUri: 'http://localhost:8080/oauth2callback'
+    redirectUri: 'http://localhost:51121/oauth-callback'
   },
   
   // Logging

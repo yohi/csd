@@ -26,7 +26,7 @@ export class GoogleAuth {
             const server = createServer((req, res) => {
                 const url = parseUrl(req.url || '', true);
 
-                if (url.pathname === '/oauth2callback') {
+                if (url.pathname === '/oauth-callback') {
                     const code = url.query.code as string;
                     const error = url.query.error as string;
 
@@ -42,8 +42,8 @@ export class GoogleAuth {
                 }
             });
 
-            server.listen(8080, 'localhost', () => {
-                logger.debug('Local OAuth server started on http://localhost:8080');
+            server.listen(51121, 'localhost', () => {
+                logger.debug('Local OAuth server started on http://localhost:51121');
                 resolve({ server, code: codePromise });
             });
         });
