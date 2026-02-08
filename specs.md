@@ -199,14 +199,10 @@ export const handleMessages = async (req, res) => {
   
   let backendResponse;
   
-  if (model.startsWith('gpt') |
-
-| model.includes('codex')) {
+  if (model.startsWith('gpt') || model.includes('codex')) {
     const token = await getValidCodexToken();
     backendResponse = await callOpenAI(req.body, token); // Codexへ
-  } else if (model.startsWith('gemini') |
-
-| model.includes('antigravity')) {
+  } else if (model.startsWith('gemini') || model.includes('antigravity')) {
     const token = await getValidAntigravityToken();
     backendResponse = await callGoogle(req.body, token); // Antigravityへ
   } else {
