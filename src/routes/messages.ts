@@ -47,6 +47,7 @@ export const handleMessages = async (req: Request, res: Response) => {
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
             try {
+                const forwardBody = { ...req.body, stream };
                 const response = await fetch('https://api.anthropic.com/v1/messages', {
                     method: 'POST',
                     headers: {
@@ -54,7 +55,7 @@ export const handleMessages = async (req: Request, res: Response) => {
                         'x-api-key': apiKey as string,
                         'anthropic-version': (anthropicVersion as string) || '2023-06-01'
                     },
-                    body: JSON.stringify(req.body),
+                    body: JSON.stringify(forwardBody),
                     signal: controller.signal
                 });
 

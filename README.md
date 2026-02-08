@@ -34,8 +34,8 @@ ClaudeCodeから指定されたモデルは、以下のようにバックエン�
 
 マッピング表にないモデル名が指定された場合、ゲートウェイは以下のルールでバックエンドへリクエストをパススルー（そのまま転送）します。これにより、新しく追加されたモデルやExperimentalなモデルも即座に利用可能です。
 
-*   **OpenAI**: `gpt-` で始まるモデル名は、そのままOpenAIへ転送されます（例: `gpt-4-turbo`）。
-*   **Google**: `gemini-` で始まるモデル名は、そのままGoogleへ転送されます（例: `gemini-1.5-flash`）。
+*   **OpenAI**: `gpt-`, `o1-`〜`o9-`, `chatgpt-` で始まるモデル名、または `codex` を含むモデル名は、そのままOpenAIへ転送されます（例: `gpt-4-turbo`, `o1-preview`）。
+*   **Google**: `gemini-` で始まるモデル名、または `antigravity` を含むモデル名は、そのままGoogleへ転送されます（例: `gemini-1.5-flash`, `gemini-2.0-pro-exp`）。
 
 ## インストールとセットアップ
 
