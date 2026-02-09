@@ -75,10 +75,7 @@ const isMainModule = process.argv[1] === fileURLToPath(import.meta.url) ||
     process.argv[1]?.endsWith('index.ts') ||
     process.argv.some(arg => arg.includes('tsx') || arg.includes('ts-node'));
 
-if (true) { // Validating if this works by forcing start
-    // Keep process alive for debugging
-    setInterval(() => { }, 10000);
-
+if (isMainModule) {
     const server = startServer();
 
     // Graceful shutdown

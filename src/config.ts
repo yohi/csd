@@ -9,7 +9,7 @@ const openaiClientId = process.env.JANUS_OPENAI_CLIENT_ID;
 export const config = {
   // Server configuration
   port: parseInt(process.env.JANUS_PORT || '4000', 10),
-  host: '0.0.0.0', // Security: bind to all interfaces for testing
+  host: process.env.JANUS_HOST || '127.0.0.1', // Default to localhost for security, allow override
 
   // OpenAI (Codex) configuration
   openai: {

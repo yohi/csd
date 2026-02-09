@@ -143,6 +143,7 @@ export class GoogleTranspiler {
         if (!tools || tools.length === 0) return undefined;
 
         const transformedTools: any[] = [];
+        const functionDeclarations: any[] = [];
 
         for (const tool of tools) {
             // Special handling for web_search -> googleSearch grounding
@@ -156,12 +157,16 @@ export class GoogleTranspiler {
             // Standard function calling conversion
             const parameters = this.cleanSchema(tool.input_schema || { type: 'object', properties: {} });
 
+            functionDeclarations.push({
+                name: tool.name,
+                description: tool.description || '',
+                parameters
+            });
+        }
+
+        if (functionDeclarations.length > 0) {
             transformedTools.push({
-                functionDeclarations: [{
-                    name: tool.name,
-                    description: tool.description || '',
-                    parameters
-                }]
+                functionDeclarations: functionDeclarations
             });
         }
 
@@ -173,16 +178,6 @@ export class GoogleTranspiler {
      */
     private getThinkingConfig(model: string): { thinkingBudget: number } | null {
         // Models that support thinking/reasoning
-        // Currently disabling specific checks to rely on the caller to provide mapped model
-        // Logic should be: if model is gemini-3-flash, return null.
-        // If the mapped model *was* a thinking model, we might want to enable it, but only if supported.
-
-        // For now, Gemini 3 Flash does not support thinking config publically via this API without errors
-        // unless specific conditions are met.
-        // Returning null for now to be safe as we are forcing gemini-3-flash.
-        return null;
-
-        /* Original Logic kept for reference if needed later for other models
         if (model.includes('thinking') ||
             model.includes('opus') ||
             model.includes('o1') ||
@@ -192,7 +187,6 @@ export class GoogleTranspiler {
             };
         }
         return null;
-        */
     }
 
     /**
@@ -358,11 +352,12 @@ export class GoogleTranspiler {
                 requestBody.tools = googleReq.tools;
             }
             if (googleReq.thinkingConfig) {
-                // Check if the target Google model supports thinking
-                if (this.getThinkingConfig(model)) {
+                // Check if the original Anthropic model supports thinking
+                // We use the already computed googleReq.thinkingConfig which comes from anthropicReq.model
+                if (this.getThinkingConfig(anthropicModel)) {
                     requestBody.thinkingConfig = googleReq.thinkingConfig;
                 } else {
-                    logger.warn(`Dropping thinkingConfig for model ${model} (mapped from ${anthropicModel})`);
+                    logger.warn(`Dropping thinkingConfig for model ${anthropicModel}`);
                 }
             }
 

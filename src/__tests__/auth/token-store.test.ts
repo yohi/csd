@@ -8,6 +8,8 @@ describe('TokenStore', () => {
     let tokenStore: TokenStore;
     let testDir: string;
     let testTokenPath: string;
+    let originalHome: string | undefined;
+    let originalUserProfile: string | undefined;
 
     beforeEach(async () => {
         // Create a temporary directory for test tokens
@@ -15,10 +17,20 @@ describe('TokenStore', () => {
         await fs.mkdir(testDir, { recursive: true });
         testTokenPath = join(testDir, 'test-token.json');
 
+        // Mock HOME and USERPROFILE to isolate tests
+        originalHome = process.env.HOME;
+        originalUserProfile = process.env.USERPROFILE;
+        process.env.HOME = testDir;
+        process.env.USERPROFILE = testDir;
+
         tokenStore = new TokenStore('test-encryption-key-for-testing', 'test-salt');
     });
 
     afterEach(async () => {
+        // Restore environment variables
+        process.env.HOME = originalHome;
+        process.env.USERPROFILE = originalUserProfile;
+
         // Clean up test directory
         try {
             await fs.rm(testDir, { recursive: true, force: true });

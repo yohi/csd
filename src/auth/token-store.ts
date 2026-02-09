@@ -41,7 +41,7 @@ export class TokenStore {
                 salt = salt || randomBytes(16).toString('hex');
                 
                 try {
-                    writeFileSync(keyPath, JSON.stringify({ password, salt }), 'utf8');
+                    writeFileSync(keyPath, JSON.stringify({ password, salt }), { encoding: 'utf8', mode: 0o600 });
                     logger.info(`Generated new encryption key and saved to ${keyPath}`);
                 } catch (e) {
                     logger.error('Failed to save generated encryption key:', e);
