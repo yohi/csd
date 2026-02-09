@@ -51,7 +51,7 @@ ClaudeCodeから指定されたモデルは、以下のようにバックエン�
 ### インストール
 
 ```bash
-git clone [https://github.com/yohi/janus.git](https://github.com/yohi/janus.git)
+git clone https://github.com/yohi/janus.git
 cd janus
 npm install
 npm run build
