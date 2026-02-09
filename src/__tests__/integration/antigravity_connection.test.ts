@@ -1,20 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
+// Don't mock googleAuth directly, verify integration with tokenStore
+import { googleAuth } from '../../auth/google.js';
+import { tokenStore } from '../../auth/token-store.js';
 
-const mocks = vi.hoisted(() => ({
-    getValidToken: vi.fn(),
-    login: vi.fn(),
-}));
-
-// Mock dependencies BEFORE importing app
-vi.mock('../../auth/google.js', () => ({
-    googleAuth: {
-        getValidToken: mocks.getValidToken,
-        login: mocks.login,
+// Mock tokenStore to control auth state
+vi.mock('../../auth/token-store.js', () => ({
+    tokenStore: {
+        load: vi.fn(),
+        save: vi.fn(),
+        delete: vi.fn(),
+        isTokenValid: vi.fn(),
     }
 }));
-
-import { googleAuth } from '../../auth/google.js';
 
 // Mock config to ensure stable environment
 vi.mock('../../config.js', async (importOriginal) => {
@@ -50,8 +48,15 @@ describe('Antigravity Integration', () => {
     beforeEach(() => {
         originalFetch = global.fetch;
         vi.stubGlobal('fetch', fetchMock);
-        // Setup default auth mock
-        mocks.getValidToken.mockResolvedValue(MOCK_TOKEN);
+        
+        // Setup default token store state (Authenticated)
+        vi.mocked(tokenStore.load).mockResolvedValue({
+            access_token: MOCK_TOKEN,
+            refresh_token: 'mock_refresh_token',
+            expires_at: Date.now() + 3600000, // 1 hour valid
+            scope: 'openid email'
+        });
+        vi.mocked(tokenStore.isTokenValid).mockReturnValue(true);
     });
 
     afterEach(() => {
@@ -131,8 +136,8 @@ describe('Antigravity Integration', () => {
             }
         });
 
-        // Verify Auth Flow
-        expect(mocks.getValidToken).toHaveBeenCalled();
+        // Verify that googleAuth actually called tokenStore
+        expect(tokenStore.load).toHaveBeenCalled();
         
         // Verify API Call
         const generateCall = fetchMock.mock.calls.find(call => call[0].includes('generateContent'));
@@ -144,8 +149,8 @@ describe('Antigravity Integration', () => {
     });
 
     it('should handle authentication failure from Antigravity', async () => {
-        // Mock token generation failure
-        mocks.getValidToken.mockRejectedValue(new Error('Auth failed'));
+        // Mock token load failure (Simulate no token found)
+        vi.mocked(tokenStore.load).mockResolvedValue(null);
 
         const response = await request(app)
             .post('/v1/messages')
