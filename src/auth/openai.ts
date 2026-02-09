@@ -52,9 +52,22 @@ export class OpenAIAuth {
 
                 const redirectUrl = parseUrl(config.openai.redirectUri);
                 if (url.pathname === redirectUrl.pathname) {
-                    const code = url.query.code as string;
-                    const state = url.query.state as string;
-                    const error = url.query.error as string;
+                    const codeParam = url.query.code;
+                    const stateParam = url.query.state;
+                    const errorParam = url.query.error;
+
+                    if (Array.isArray(codeParam) || Array.isArray(stateParam) || Array.isArray(errorParam)) {
+                        const msg = 'Multiple query parameters received for code, state, or error';
+                        logger.warn(msg);
+                        res.writeHead(400, { 'Content-Type': 'text/html' });
+                        res.end(`<h1>Authentication Failed</h1><p>Invalid request: ${msg}</p>`);
+                        codeResolver('');
+                        return;
+                    }
+
+                    const code = codeParam as string | undefined;
+                    const state = stateParam as string | undefined;
+                    const error = errorParam as string | undefined;
 
                     if (error) {
                         const safeError = this.escapeHtml(error);
