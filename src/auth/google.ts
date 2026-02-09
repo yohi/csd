@@ -60,6 +60,10 @@ export class GoogleAuth {
                         res.writeHead(200, { 'Content-Type': 'text/html' });
                         res.end('<h1>Authentication Successful!</h1><p>You can close this window now.</p>');
                         codeResolver(code);
+                    } else {
+                        res.writeHead(400, { 'Content-Type': 'text/html' });
+                        res.end('<h1>Authentication Failed</h1><p>No authorization code received.</p>');
+                        codeResolver('');
                     }
                 }
             });
