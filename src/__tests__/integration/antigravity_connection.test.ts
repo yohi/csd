@@ -1,5 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
+
+const mocks = vi.hoisted(() => ({
+    getValidToken: vi.fn(),
+    login: vi.fn(),
+}));
+
+// Mock dependencies BEFORE importing app
+vi.mock('../../auth/google.js', () => ({
+    googleAuth: {
+        getValidToken: mocks.getValidToken,
+        login: mocks.login,
+    }
+}));
+
 import { googleAuth } from '../../auth/google.js';
 
 // Mock config to ensure stable environment
@@ -36,14 +50,14 @@ describe('Antigravity Integration', () => {
     beforeEach(() => {
         originalFetch = global.fetch;
         vi.stubGlobal('fetch', fetchMock);
-        // Setup default auth mock using spyOn to ensure it works even if module is not fully mocked
-        vi.spyOn(googleAuth, 'getValidToken').mockResolvedValue(MOCK_TOKEN);
+        // Setup default auth mock
+        mocks.getValidToken.mockResolvedValue(MOCK_TOKEN);
     });
 
     afterEach(() => {
         vi.stubGlobal('fetch', originalFetch);
         fetchMock.mockReset();
-        vi.restoreAllMocks();
+        vi.clearAllMocks();
     });
 
     it('should successfully proxy Claude request to Antigravity (Gemini)', async () => {
@@ -118,7 +132,7 @@ describe('Antigravity Integration', () => {
         });
 
         // Verify Auth Flow
-        expect(googleAuth.getValidToken).toHaveBeenCalled();
+        expect(mocks.getValidToken).toHaveBeenCalled();
         
         // Verify API Call
         const generateCall = fetchMock.mock.calls.find(call => call[0].includes('generateContent'));
@@ -131,7 +145,7 @@ describe('Antigravity Integration', () => {
 
     it('should handle authentication failure from Antigravity', async () => {
         // Mock token generation failure
-        vi.spyOn(googleAuth, 'getValidToken').mockRejectedValue(new Error('Auth failed'));
+        mocks.getValidToken.mockRejectedValue(new Error('Auth failed'));
 
         const response = await request(app)
             .post('/v1/messages')
