@@ -16,6 +16,15 @@ interface TokenResponse {
 }
 
 export class GoogleAuth {
+    private escapeHtml(unsafe: string): string {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     private async startLocalServer(): Promise<{ server: Server; code: Promise<string> }> {
         return new Promise((resolve) => {
             let codeResolver: (code: string) => void;
@@ -26,24 +35,41 @@ export class GoogleAuth {
             const server = createServer((req, res) => {
                 const url = parseUrl(req.url || '', true);
 
-                if (url.pathname === '/oauth2callback') {
-                    const code = url.query.code as string;
-                    const error = url.query.error as string;
+                if (url.pathname === '/oauth-callback') {
+                    const codeParam = url.query.code;
+                    const errorParam = url.query.error;
+
+                    if (Array.isArray(codeParam) || Array.isArray(errorParam)) {
+                        const msg = 'Multiple query parameters received for code or error';
+                        logger.warn(msg);
+                        res.writeHead(400, { 'Content-Type': 'text/html' });
+                        res.end(`<h1>Authentication Failed</h1><p>Invalid request: ${msg}</p>`);
+                        codeResolver('');
+                        return;
+                    }
+
+                    const code = codeParam as string | undefined;
+                    const error = errorParam as string | undefined;
 
                     if (error) {
+                        const safeError = this.escapeHtml(error);
                         res.writeHead(400, { 'Content-Type': 'text/html' });
-                        res.end(`<h1>Authentication Failed</h1><p>Error: ${error}</p>`);
+                        res.end(`<h1>Authentication Failed</h1><p>Error: ${safeError}</p>`);
                         codeResolver('');
                     } else if (code) {
                         res.writeHead(200, { 'Content-Type': 'text/html' });
                         res.end('<h1>Authentication Successful!</h1><p>You can close this window now.</p>');
                         codeResolver(code);
+                    } else {
+                        res.writeHead(400, { 'Content-Type': 'text/html' });
+                        res.end('<h1>Authentication Failed</h1><p>No authorization code received.</p>');
+                        codeResolver('');
                     }
                 }
             });
 
-            server.listen(8080, 'localhost', () => {
-                logger.debug('Local OAuth server started on http://localhost:8080');
+            server.listen(51121, 'localhost', () => {
+                logger.debug('Local OAuth server started on http://localhost:51121');
                 resolve({ server, code: codePromise });
             });
         });
